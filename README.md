@@ -20,9 +20,10 @@ Open the project in a suitable IDE which supports .NET Core 6 and running tests.
 
 ## Project Goals
 
-This project addresses three goals:
+This project addresses four goals:
 
 * Provide an example of a Password Import inline hook.
+* How to handle the dynamic JSON requests and responses using dynamic objects.
 * Demonstrate the use of an LDAP server for password verification.
 * Show unit and integration testing strategies for unmockable code, e.g. LdapConnection.
 

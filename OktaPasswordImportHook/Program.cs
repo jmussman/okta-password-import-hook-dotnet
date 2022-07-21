@@ -1,4 +1,6 @@
-﻿// using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
+﻿// Program
+// Copyright © 2022 Joel A Mussman. All rights reserved.
+//
 
 using OktaPasswordImportHook.Services;
 
@@ -11,10 +13,26 @@ builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Local services.
+// Local services. The pasword validator used depends on what is specified in the configuration. The configuration
+// cascades: if AD is specified it will be used, followed by LDAP.
 
-builder.Services.AddSingleton<ILdapBuilder, LdapBuilderService>();
-builder.Services.AddSingleton<IPasswordValidator, LdapPasswordValidatorService>();
+string activeDirectory = builder.Configuration["ActiveDirectory"];
+
+if (activeDirectory != null && activeDirectory.ToLower() == "true") {
+
+    builder.Services.AddSingleton<IPrincipalContextProxyBuilder, PrincipalContextDomainProxyBuilder>();
+    builder.Services.AddSingleton<IPasswordValidator, AdPasswordValidatorService>();
+
+} else {
+
+    string ldapServer = builder.Configuration["Ldap:Server"];
+
+    if (ldapServer != null) {
+
+        builder.Services.AddSingleton<ILdapBuilder, LdapBuilder>();
+        builder.Services.AddSingleton<IPasswordValidator, LdapPasswordValidatorService>();
+    }
+}
 
 var app = builder.Build();
 
@@ -30,4 +48,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

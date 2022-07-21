@@ -6,7 +6,9 @@ This solution implements an Okta inline hook for Password Import.
 The purpose of the inline hook is to handle the verifification of a password missing in the Okta organization against another directory or database.
 If the password is deemed to be correct, then Okta will set the cleartext password it saw as the user's password, this is the *import* part of the scenario.
 
-This solution will run out of the box and the unit and integration tests will pass. The target for password verification is a bind to an LDAP server. To actually use the project the appsettings.json file would have to be configured with a real target server, and the user must be created in the Okta organization with a specification to use the hook: [Create User with Password Import Inline Hook](https://developer.okta.com/docs/reference/api/users/#create-user-with-password-import-inline-hook).
+This solution will run out of the box and the unit and integration tests will pass.
+The target for password verification is to use a local Active Directory domain or bind to an LDAP server.
+To actually use the project the appsettings.json file would have to be configured with a real target server, and the user must be created in the Okta organization with a specification to use the hook: [Create User with Password Import Inline Hook](https://developer.okta.com/docs/reference/api/users/#create-user-with-password-import-inline-hook).
 
 ## License
 
@@ -18,14 +20,15 @@ The API project targets .NET Core 6 and above.
 The unit and integration tests are written with xUnit with Moq.
 Open the project in a suitable IDE which supports .NET Core 6 and running tests.
 
-## Project Goals
+## Project
 
-This project addresses four goals:
+This project addresses several goals:
 
 * Provide an example of a Password Import inline hook.
-* How to handle the dynamic JSON requests and responses using dynamic objects.
+* Show how to handle the dynamic JSON requests and responses using dynamic objects.
+* Demonstrate the use of an Active Directory server for password verification.
 * Demonstrate the use of an LDAP server for password verification.
-* Show unit and integration testing strategies for unmockable code, e.g. LdapConnection.
+* Show unit and integration testing strategies for unmockable code, e.g. DirectoryContext and LdapConnection.
 
 ### Architecture
 
@@ -34,8 +37,9 @@ It supports GET and POST operations.
 The GET operation is simply a reminder to use POST, and acts as a verification that the API is running.
 The POST operation follows the guidelines of the [Password Import Inline Hook Reference](https://developer.okta.com/docs/reference/password-hook/).
 
-The controller uses the LdapPasswordValidatorService class to verify a password.
-It implements the IPasswordValidatorService.
+The controller leverages a class implementing IPasswordValidatorService to verify credentials.
+The actual class is injected from the object pool built in *program.cs*.
+The contents of the object pool is initialized to AdPasswordValidatorService or LdapPasswordValidatorService depending on appsettings.json.
 
 The controller is responsible for referencing the JSON request, and building a JSON response.
 There is a lot of information in the request that is not necessary, so instead of building a hierarchy of classes to represent it
@@ -79,14 +83,15 @@ This class has a single property which is the *dynamic* object.
 When handled this way, the ActionResult instance has a Value property correctly set to the DynamicResponse instance, where the
 *dynamic* response is correctly evaluated.
 
-### LdapConnection and Testing Issues
+### PrincipalContext, LdapConnection, and Testing Issues
 
-System.DirectoryServices.Protocols.LdapConnection does not implement an interface.
-C# classes are not inherently mockable unless all of the properties and methods are marked as virtual.
-The LdapConnection scenario assumes that the client will simply make *new* instances of it and use them to query the LDAP server,
+Most of the .NET library does not implement interfaces, and Moq cannot override non-virtual class methods.
+For example, the LdapConnection scenario assumes that the client will simply make *new* instances of it and use them to query the LDAP server,
 and that is exactly what should *not* happen during unit testing.
+The PrincipalContext scenario for Active Directory has the same problem.
+The LdapConnection solution is the more complex and is discussed here.
 
-To solve this problem, the client code is written to use an interface and wrapper around the LdapConnection, ILdapConnectionProxy
+To solve the test-double problem, the client code is written to use an interface and wrapper around the LdapConnection, ILdapConnectionProxy
 and the implementation LdapConnectionProxyServer.
 The class is instantiated and injected into the password validation service:
 
@@ -221,5 +226,15 @@ The target server is LDAP provided by an Okta organization at dev-77167726.ldap.
 As long as that Okta development server organization is running LDAP, the integration test will work using a well-known username
 and password.
 
+## Deployment
+
+To bundle the application into a single executable, in the solution folder run
+
+```
+ dotnet publish .\OktaPasswordImportHook\OktaPasswordImportHook.csproj -r win-x64 /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true -c Release
+```
+
+The executable will be left in the .\OktaPasswordImportHook\bin\Release folder.
+The specific subfolder may vary depending on what platform is targeted.
 <hr>
 Copyright © 2022 Joel Mussman. All rights reserved.

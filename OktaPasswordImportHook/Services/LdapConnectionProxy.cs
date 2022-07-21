@@ -12,12 +12,15 @@
 
 using System.DirectoryServices.Protocols;
 using System.Net;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("OktaPasswordImportHookTest")]
 
 namespace OktaPasswordImportHook.Services;
 
 public class LdapConnectionProxy : ILdapConnectionProxy {
 
-    private LdapConnection connection;
+    internal LdapConnection connection;
     private ILdapSessionOptionsProxy sessionOptionsProxy;
 
     public LdapConnectionProxy(LdapDirectoryIdentifier identifier) {
@@ -30,6 +33,11 @@ public class LdapConnectionProxy : ILdapConnectionProxy {
 
         get { return connection.AuthType; }
         set { connection.AuthType = value; }
+    }
+
+    public DirectoryIdentifier Directory {
+
+        get { return connection.Directory; }
     }
 
     public NetworkCredential Credential {

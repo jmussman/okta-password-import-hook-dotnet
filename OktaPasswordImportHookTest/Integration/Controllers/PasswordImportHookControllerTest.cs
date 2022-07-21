@@ -1,11 +1,10 @@
-﻿// PasswordImportHookControllerTest
+﻿// PasswordImportHookController
 // Copyright © 2022 Joel A Mussman. All rights reserved.
 //
 
-namespace OktaPasswordImportHookTest.Controllers;
+namespace OktaPasswordImportHookTest.Integration.Controllers;
 
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -13,7 +12,10 @@ using Xunit;
 
 using OktaPasswordImportHook.Controllers;
 using OktaPasswordImportHook.Services;
+using Microsoft.AspNetCore.Mvc;
 using OktaPasswordImportHook.Dtos;
+using Microsoft.AspNetCore.Http;
+using System.Runtime.InteropServices;
 
 public class PasswordImportHookControllerTest {
 
@@ -53,42 +55,56 @@ public class PasswordImportHookControllerTest {
 
     private string authenticationField;
     private string authenticationSecret;
-    private HttpContext httpContext;
     private Mock<IConfiguration> configurationMock;
-    private Mock<ILogger<PasswordImportHookController>> loggerMock;
-    private Mock<IPasswordValidator> passwordValidatorMock;
-    private dynamic ?requestData;
     private PasswordImportHookController controller;
+    private HttpContext httpContext;
+    private ILdapBuilder ldapBuilder;
+	private Mock<ILogger<LdapPasswordValidatorService>> ldapPasswordValidatorServiceLoggerMock;
+	private Mock<ILogger<PasswordImportHookController>> passwordImportHookControllerLoggerMock;
+	private IPasswordValidator passwordValidator;
+    private dynamic? requestData;
 
     public PasswordImportHookControllerTest() {
+
+        // Credentials.
 
         authenticationField = "mydomain-authentication";
         authenticationSecret = "secret";
 
+        // HTTP context for the call.
+
         httpContext = new DefaultHttpContext();
         httpContext.Request.Headers[authenticationField] = authenticationSecret;
-
-        configurationMock = new Mock<IConfiguration>();
-        configurationMock.Setup(x => x["Hook:AuthenticationField"]).Returns(authenticationField);
-        configurationMock.Setup(x => x["Hook:AuthenticationSecret"]).Returns(authenticationSecret);
-
-        // Mocking the functionality of the logger for things like verification is not really
-        // possible becuase the Log methods are defined as extension methods. We'll just mock
-        // a logger and ignore it.
-
-        loggerMock = new Mock<ILogger<PasswordImportHookController>>();
-        // loggerMock.Setup(x => x.LogError(It.IsAny<string>())).Verifiable();
-
-        // The only thing exposed in the validator is Validate.
-
-        passwordValidatorMock = new Mock<IPasswordValidator>();
-        passwordValidatorMock.Setup(x => x.Validate(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
         // Setup the JsonDocument for the call.
 
         requestData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(json);
 
-        controller = new PasswordImportHookController(configurationMock.Object, loggerMock.Object, passwordValidatorMock.Object) {
+        // We could build a configuration that reads appsettings.json, but it's easier just to build the mock :) This test
+        // will actually run as long as dev-77167726.ldap.okta.com is running, annebonny@potc.live and P!rates17 are a valid
+        // user in that Okta tenant.
+
+        configurationMock = new Mock<IConfiguration>();
+        configurationMock.Setup(x => x["Ldap:Server"]).Returns("dev-77167726.ldap.okta.com");
+        configurationMock.Setup(x => x["Ldap:Port"]).Returns("389");
+        configurationMock.Setup(x => x["Ldap:StartTls"]).Returns("true").Verifiable();
+        configurationMock.Setup(x => x["Ldap:Base"]).Returns("ou=users,dc=dev-77167726,dc=okta,dc=com");
+        configurationMock.Setup(x => x["Ldap:Identifier"]).Returns("uid");
+        configurationMock.Setup(x => x["Ldap:VerifyServerCertificate"]).Returns(
+            System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "true" : "false");
+        configurationMock.Setup(x => x["Hook:AuthenticationField"]).Returns(authenticationField);
+        configurationMock.Setup(x => x["Hook:AuthenticationSecret"]).Returns(authenticationSecret);
+
+        // Set up a real password validator service.
+
+        ldapPasswordValidatorServiceLoggerMock = new Mock<ILogger<LdapPasswordValidatorService>>();
+		ldapBuilder = new LdapBuilder();
+		passwordValidator = new LdapPasswordValidatorService(configurationMock.Object, ldapPasswordValidatorServiceLoggerMock.Object, ldapBuilder);
+
+        // Set up a real controller.
+
+		passwordImportHookControllerLoggerMock = new Mock<ILogger<PasswordImportHookController>>();
+        controller = new PasswordImportHookController(configurationMock.Object, passwordImportHookControllerLoggerMock.Object, passwordValidator) {
 
             ControllerContext = new ControllerContext() {
 
@@ -96,6 +112,7 @@ public class PasswordImportHookControllerTest {
             }
         };
     }
+
 
     [Fact]
     public void AuthenticationSuccess() {
@@ -116,7 +133,13 @@ public class PasswordImportHookControllerTest {
     [Fact]
     public void AuthenticationFailure() {
 
-        passwordValidatorMock.Setup(x => x.Validate(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        if (requestData != null) {
+
+            // The null check is only because requestData is nullable via Newtonsoft, which is not going to happen. But
+            // if it did, the test will fail anyways because the object is null.
+
+            requestData.data.context.credential.password = "bad-password";
+        }
 
         ActionResult<DynamicResponse> response = controller.Authenticate(requestData);
 
@@ -127,47 +150,5 @@ public class PasswordImportHookControllerTest {
             Assert.Equal("com.okta.action.update", (string)response.Value.Response.commands[0].type);
             Assert.Equal("UNVERIFIED", (string)response.Value.Response.commands[0].value.credential);
         }
-    }
-
-    [Fact]
-    public void AuthorizationFieldMissingDenied() {
-
-        authenticationField = "wrong-fieldname";
-        authenticationSecret = "secret";
-
-        httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers[authenticationField] = authenticationSecret;
-
-        controller = new PasswordImportHookController(configurationMock.Object, loggerMock.Object, passwordValidatorMock.Object) {
-
-            ControllerContext = new ControllerContext() {
-                HttpContext = httpContext,
-            }
-        };
-
-        ActionResult<DynamicResponse> response = controller.Authenticate(requestData);
-
-        Assert.IsType<UnauthorizedResult>(response.Result);
-    }
-
-    [Fact]
-    public void AuthorizationWrongSecretDenied() {
-
-        authenticationField = "mydomain-authentication";
-        authenticationSecret = "password";
-
-        httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers[authenticationField] = authenticationSecret;
-
-        controller = new PasswordImportHookController(configurationMock.Object, loggerMock.Object, passwordValidatorMock.Object) {
-
-            ControllerContext = new ControllerContext() {
-                HttpContext = httpContext,
-            }
-        };
-
-        ActionResult<DynamicResponse> response = controller.Authenticate(requestData);
-
-        Assert.IsType<UnauthorizedResult>(response.Result);
     }
 }

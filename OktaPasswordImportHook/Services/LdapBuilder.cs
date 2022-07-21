@@ -1,4 +1,4 @@
-﻿// LdapBuilderService
+﻿// LdapBuilder
 // Copyright © 2022 Joel A Mussman. All rights reserved.
 //
 // The LdapBuilderService exists to eliminates the new calls from the validation
@@ -10,7 +10,7 @@ using System.Net;
 
 namespace OktaPasswordImportHook.Services;
 
-public class LdapBuilderService : ILdapBuilder {
+public class LdapBuilder : ILdapBuilder {
 
     public ILdapConnectionProxy LdapConnection(LdapDirectoryIdentifier identifier) {
 

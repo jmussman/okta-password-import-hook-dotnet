@@ -13,9 +13,9 @@ namespace OktaPasswordImportHook.Services;
 public interface ILdapConnectionProxy {
 
     AuthType AuthType { get; set; }
+    DirectoryIdentifier Directory { get; }
     NetworkCredential Credential { set; }
     ILdapSessionOptionsProxy SessionOptions { get; }
-
     void Bind();
     void Dispose();
 }

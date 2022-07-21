@@ -6,7 +6,7 @@
 // the result into "var" it reads right in the debeugger, but the loop shows up during
 // evaluation.
 //
-// This wraps the dynamic response in a static object, which does pass back correclty as
+// This wraps the dynamic response in a static object, which does pass back correctly as
 // an ActionResult<DynamicResponse>.
 //
 

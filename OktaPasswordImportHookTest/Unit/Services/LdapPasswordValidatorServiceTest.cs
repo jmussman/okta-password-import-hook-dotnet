@@ -1,13 +1,8 @@
 ﻿// LdapPasswordValidatorServiceTest
 // Copyright © 2022 Joel A Mussman. All rights reserved.
 //
-// Testing any code that leverages the LDAP functionality of System.DirectoryServices
-// is difficult, because the code is riddled with non-overridable methods, extension
-// methods, and non-existing iterfaces. This test class demonstrates how to work around
-// most of the problems.
-//
 
-namespace OktaPasswordImportHookTest.Services;
+namespace OktaPasswordImportHookTest.Unit.Services;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -19,7 +14,6 @@ using Xunit;
 using OktaPasswordImportHook.Services;
 
 public class LdapPasswordValidatorServiceTest {
-
 
     private string username;
     private string password;

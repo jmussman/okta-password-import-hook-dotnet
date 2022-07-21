@@ -51,11 +51,17 @@ public class LdapSessionOptionsProxyTest {
     [Fact]
     public void VerifyServerCertificateAttachedToSessionOptions() {
 
-        VerifyServerCertificateCallback callback = (LdapConnection connection, X509Certificate certificate) => { return true; };
+        // This test is isolated to Windows, on the Mac it will respond with "The LDAP server is unavailabe"
+        // because certificate verification does not work in that environment and cannot be tested.
 
-        ldapSessionOptionsProxy.VerifyServerCertificate = callback;
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)) {
 
-        Assert.Equal(callback, ldapConnection.SessionOptions.VerifyServerCertificate);
+            VerifyServerCertificateCallback callback = (LdapConnection connection, X509Certificate certificate) => { return true; };
+
+            ldapSessionOptionsProxy.VerifyServerCertificate = callback;
+
+            Assert.Equal(callback, ldapConnection.SessionOptions.VerifyServerCertificate);
+        }
     }
 
     // Without a way to mock this method there is not any way to check it is called with the correct parameter.

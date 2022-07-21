@@ -228,13 +228,14 @@ and password.
 
 ## Deployment
 
-To bundle the application into a single executable, in the solution folder run
+To bundle the application into a single executable, in the solution folder on run (the forward slashes in the pathname work in powershell)
 
 ```
- dotnet publish .\OktaPasswordImportHook\OktaPasswordImportHook.csproj -r win-x64 /p:PublishSingleFile=true /p:IncludeAllContentForSelfExtract=true -c Release
+dotnet publish ./OktaPasswordImportHook/OktaPasswordImportHook.csproj -r win-x64 -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -c Release --self-contained
 ```
 
-The executable will be left in the .\OktaPasswordImportHook\bin\Release folder.
+The executable will be left in a subfolder of ./OktaPasswordImportHook/bin/Release folder.
 The specific subfolder may vary depending on what platform is targeted.
+Change the runtime target as appropriate, e.g. *-r osx-x64*.
 <hr>
 Copyright © 2022 Joel Mussman. All rights reserved.

@@ -16,9 +16,40 @@ The code is licensed under the MIT license. You may use and modify all or part o
 
 ## Software Configuration
 
-The API project targets .NET Core 6 and above.
+The API project targets .NET Core 6 and above and the LDAP password validation supports all platforms, the Active Directory validation only works on Windows Active Directory member servers.
+
 The unit and integration tests are written with xUnit with Moq.
-Open the project in a suitable IDE which supports .NET Core 6 and running tests.
+To work with or build the project open it in a suitable IDE
+which supports .NET Core 6 and running tests.
+
+### appsettings.json
+
+The applications are in the default file appsettings.json.
+There are two properties added to this file.
+"ActiveDirectory" is a true or false value,
+"Ldap" controls how to communicate with the LDAP server, and
+"Hook" sets up the credentials that Okta will use when calling this API:
+
+```
+  "ActiveDirectory": true,
+  "Ldap": {
+    "Server": "dev-77167726.ldap.okta.com",
+    "Port": "389",
+    "StartTls": true,
+    "Base": "ou=users,dc=dev-77167726,dc=okta,dc=com",
+    "Identifier": "uid",
+    "verifyServerCertificate": false
+  },
+  "Hook": {
+    "AuthenticationField": "mydomain-authentication",
+    "AuthenticationSecret": "secret"
+  }
+```
+
+VerifyServerCertificate fails do to a bug in the .NET code, so leave it "false".
+If the *ActiveDirectory* property exists and is *true*, LDAP is ignored.
+
+The API will reject requests that do not carry the secret in the named authentication field.
 
 ## Project
 
@@ -28,7 +59,7 @@ This project addresses several goals:
 * Show how to handle the dynamic JSON requests and responses using dynamic objects.
 * Demonstrate the use of an Active Directory server for password verification.
 * Demonstrate the use of an LDAP server for password verification.
-* Show unit and integration testing strategies for unmockable code, e.g. DirectoryContext and LdapConnection.
+* Show unit and integration testing strategies for unmockable code, e.g. PrincipalContext and LdapConnection.
 
 ### Architecture
 
@@ -193,6 +224,16 @@ public class LdapBuilderService : ILdapBuilder {
 The real builder will build real LdapDirectoryIdentifer, LdapConnection wrapped by ILdapConnectionProxy, and NetworkCredential objects.
 A mock builder can provide mocks of the LdapDirectoryIdentifier (it is mockable), ILdapConnectionProxy, and the NetworkCredential
 (also mockable).
+
+### Untenable Tests
+
+It would be nice to have tests that verify the proxies, to make sure that the parameters
+are used correctely.
+In some instances this is achievable, but there are some cases where it cannot work.
+For example, instantiating a PrincipalContext object tries to establish a network
+connection and that is not a repeatable test.
+
+There are some tests which are platform-constrained as well: testing VerifyCertificate works on the Windows platform but is not supported on the Mac, so there is a platform dependent check in the test.
 
 ### Integration Testing
 
